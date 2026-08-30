@@ -12,6 +12,12 @@ spring:
 jp:
   billing:
     reconciliation-enabled: false
+    plans:
+      - code: standard
+        name: Standard
+        amount-cents: 9900
+        trial-days: 14
+        max-units: 10
     asaas:
       api-key: test
       webhook-token: test-webhook-token

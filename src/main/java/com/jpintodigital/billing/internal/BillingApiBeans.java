@@ -22,6 +22,11 @@ public class BillingApiBeans {
     }
 
     @Bean
+    PlanSeeder planSeeder(PlanRepository plans, BillingProperties properties) {
+        return new PlanSeeder(plans, properties);
+    }
+
+    @Bean
     SubscriptionReconciler subscriptionReconciler(
             SubscriptionRepository subscriptions, PaymentRepository payments, PaymentProvider provider,
             SubscriptionListener listener, BillingProperties properties, Clock clock) {

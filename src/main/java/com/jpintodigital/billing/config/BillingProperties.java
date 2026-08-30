@@ -1,10 +1,19 @@
 package com.jpintodigital.billing.config;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("jp.billing")
 public class BillingProperties {
+
+    /**
+     * Catálogo de planos que a lib semeia na tabela {@code billing_plans} no
+     * startup (insere o que faltar; não atualiza plano já existente). O host
+     * declara o próprio catálogo — a lib não tem opinião sobre preço.
+     */
+    private List<PlanDef> plans = new ArrayList<>();
 
     /** Liga a biblioteca. */
     private boolean enabled = true;
@@ -85,5 +94,63 @@ public class BillingProperties {
 
     public void setManageSchema(boolean manageSchema) {
         this.manageSchema = manageSchema;
+    }
+
+    public List<PlanDef> getPlans() {
+        return plans;
+    }
+
+    public void setPlans(List<PlanDef> plans) {
+        this.plans = plans;
+    }
+
+    /** Definição de um plano a semear. */
+    public static class PlanDef {
+
+        private String code;
+        private String name;
+        private long amountCents;
+        private int trialDays = 14;
+        private int maxUnits;
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public long getAmountCents() {
+            return amountCents;
+        }
+
+        public void setAmountCents(long amountCents) {
+            this.amountCents = amountCents;
+        }
+
+        public int getTrialDays() {
+            return trialDays;
+        }
+
+        public void setTrialDays(int trialDays) {
+            this.trialDays = trialDays;
+        }
+
+        public int getMaxUnits() {
+            return maxUnits;
+        }
+
+        public void setMaxUnits(int maxUnits) {
+            this.maxUnits = maxUnits;
+        }
     }
 }
