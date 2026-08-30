@@ -98,6 +98,23 @@ class BillingFlowIT {
     }
 
     @Test
+    void subscribeWithRawCardAttachesProviderAndConfirmsViaWebhook() throws Exception {
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+
+        var subd = billing.subscribeWithCard(tenant, new com.jpintodigital.billing.api.BillingApi.CardInput(
+                "4444444444444444", "Ada", "12", "2030", "123",
+                "ada@example.com", "12345678900", "01310000", "100", "1130000000", "8.8.8.8"));
+
+        // cartão em arquivo; a 1ª cobrança só no fim do trial, então segue TRIALING
+        assertThat(subd.providerSubscriptionId()).startsWith("sub_");
+        assertThat(billing.statusOf(tenant).orElseThrow().status()).isEqualTo(SubscriptionStatus.TRIALING);
+
+        webhook("evt-raw|PAYMENT_CONFIRMED|" + subd.providerSubscriptionId() + "|pay-raw");
+        assertThat(billing.statusOf(tenant).orElseThrow().status()).isEqualTo(SubscriptionStatus.ACTIVE);
+    }
+
+    @Test
     void webhookWithBadTokenIsRejected() throws Exception {
         provider.webhookAuthOk = false;
         try {

@@ -67,10 +67,34 @@ class AsaasHttpTest {
 
         ProviderSubscription sub = asaas.createSubscription(new SubscriptionRequest(
                 new com.jpintodigital.billing.spi.PaymentProvider.ProviderCustomer("cus_42"),
-                "tok_9", 9990L, "BRL", LocalDate.of(2026, 9, 15), "tenant:x"));
+                "tok_9", null, 9990L, "BRL", LocalDate.of(2026, 9, 15), "tenant:x"));
 
         assertThat(sub.id()).isEqualTo("sub_7");
         assertThat(sub.status()).isEqualTo(ProviderSubscriptionStatus.ACTIVE);
+        server.verify();
+    }
+
+    @Test
+    void createSubscriptionSendsRawCardWhenNoToken() {
+        server.expect(requestTo(BASE + "/subscriptions"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.billingType").value("CREDIT_CARD"))
+                .andExpect(jsonPath("$.creditCardToken").doesNotExist())
+                .andExpect(jsonPath("$.creditCard.number").value("4444444444444444"))
+                .andExpect(jsonPath("$.creditCardHolderInfo.cpfCnpj").value("11144477735"))
+                .andExpect(jsonPath("$.remoteIp").value("8.8.8.8"))
+                .andRespond(withSuccess(
+                        "{\"id\":\"sub_8\",\"status\":\"ACTIVE\",\"nextDueDate\":\"2026-09-15\"}",
+                        MediaType.APPLICATION_JSON));
+
+        var card = new com.jpintodigital.billing.spi.PaymentProvider.CardData(
+                "4444444444444444", "Ada", "12", "2030", "123",
+                "ada@example.com", "11144477735", "01310000", "100", "1130000000", "8.8.8.8");
+        ProviderSubscription sub = asaas.createSubscription(new SubscriptionRequest(
+                new com.jpintodigital.billing.spi.PaymentProvider.ProviderCustomer("cus_42"),
+                null, card, 9990L, "BRL", LocalDate.of(2026, 9, 15), "tenant:x"));
+
+        assertThat(sub.id()).isEqualTo("sub_8");
         server.verify();
     }
 

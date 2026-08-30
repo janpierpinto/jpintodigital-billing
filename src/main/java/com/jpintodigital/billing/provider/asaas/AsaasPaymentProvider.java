@@ -60,8 +60,29 @@ public class AsaasPaymentProvider implements PaymentProvider {
         body.put("value", BigDecimal.valueOf(request.amountCents(), 2));
         body.put("nextDueDate", request.firstDueDate().toString());
         body.put("cycle", properties.getCycle());
-        body.put("creditCardToken", request.cardToken());
         body.put("externalReference", request.externalReference());
+        if (request.cardToken() != null && !request.cardToken().isBlank()) {
+            body.put("creditCardToken", request.cardToken());
+        } else {
+            var c = request.card();
+            body.put("creditCard", Map.of(
+                    "holderName", nz(c.holderName()),
+                    "number", nz(c.number()),
+                    "expiryMonth", nz(c.expiryMonth()),
+                    "expiryYear", nz(c.expiryYear()),
+                    "ccv", nz(c.ccv())));
+            var holder = new LinkedHashMap<String, Object>();
+            holder.put("name", nz(c.holderName()));
+            holder.put("email", nz(c.holderEmail()));
+            holder.put("cpfCnpj", nz(c.holderCpfCnpj()));
+            holder.put("postalCode", nz(c.holderPostalCode()));
+            holder.put("addressNumber", nz(c.holderAddressNumber()));
+            holder.put("phone", nz(c.holderPhone()));
+            body.put("creditCardHolderInfo", holder);
+            if (c.remoteIp() != null && !c.remoteIp().isBlank()) {
+                body.put("remoteIp", c.remoteIp());
+            }
+        }
         var node = post("/subscriptions", body);
         return toSubscription(node);
     }

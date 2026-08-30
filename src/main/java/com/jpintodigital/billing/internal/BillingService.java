@@ -66,11 +66,27 @@ class BillingService implements BillingApi {
     @Override
     @Transactional
     public SubscriptionView subscribe(UUID tenantId, CardToken card) {
+        return doSubscribe(tenantId, card.holderName(), card.holderEmail(), card.holderCpfCnpj(),
+                card.token(), null);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionView subscribeWithCard(UUID tenantId, CardInput card) {
+        var data = new PaymentProvider.CardData(
+                card.number(), card.holderName(), card.expiryMonth(), card.expiryYear(), card.ccv(),
+                card.holderEmail(), card.holderCpfCnpj(), card.holderPostalCode(),
+                card.holderAddressNumber(), card.holderPhone(), card.remoteIp());
+        return doSubscribe(tenantId, card.holderName(), card.holderEmail(), card.holderCpfCnpj(), null, data);
+    }
+
+    private SubscriptionView doSubscribe(
+            UUID tenantId, String holderName, String holderEmail, String holderCpfCnpj,
+            String cardToken, PaymentProvider.CardData card) {
         var sub = require(tenantId);
         var plan = plan(sub.getPlanCode());
 
-        var customer = provider.ensureCustomer(
-                new CustomerRequest(card.holderName(), card.holderEmail(), card.holderCpfCnpj()));
+        var customer = provider.ensureCustomer(new CustomerRequest(holderName, holderEmail, holderCpfCnpj));
         var today = LocalDate.now(clock);
         var trialEndDate = sub.getTrialEnd() == null
                 ? today
@@ -78,7 +94,7 @@ class BillingService implements BillingApi {
         var firstDueDate = trialEndDate.isAfter(today) ? trialEndDate : today;
 
         var providerSub = provider.createSubscription(new SubscriptionRequest(
-                customer, card.token(), plan.getAmountCents(), plan.getCurrency(),
+                customer, cardToken, card, plan.getAmountCents(), plan.getCurrency(),
                 firstDueDate, "tenant:" + tenantId));
         sub.attachProvider(provider.name(), customer.id(), providerSub.id());
 
