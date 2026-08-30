@@ -5,14 +5,13 @@ import java.util.Collections;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.jpa.autoconfigure.EntityManagerFactoryDependsOnPostProcessor;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.env.Environment;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * A lib é dona do próprio schema (tabelas {@code billing_*}). As migrações em
@@ -20,11 +19,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * tabela de histórico própria ({@code flyway_schema_history_billing}) — assim as
  * versões da lib nunca colidem nem ficam fora de ordem com as {@code V*} do host.
  *
- * <p>Roda <b>depois</b> do Flyway do host (quando existe), então o host encontra
- * o schema ainda vazio e cria o próprio histórico normalmente. Usa as credenciais
- * {@code spring.flyway.url/user/password} do host quando presentes — normalmente
- * um papel com DDL, distinto do papel de runtime (RLS). Desligue com
- * {@code jp.billing.manage-schema=false} se o schema for gerenciado por fora.
+ * <p>Roda <b>depois</b> do Flyway do host (quando existe) e reaproveita o
+ * {@link DataSource} dele — normalmente um papel com DDL, distinto do papel de
+ * runtime (RLS). Sem Flyway no host, cai no {@link DataSource} primário. Desligue
+ * com {@code jp.billing.manage-schema=false} se o schema for gerenciado por fora.
  *
  * <p>O bean não é do tipo {@link Flyway} de propósito: um {@code @Bean Flyway}
  * dispararia o {@code @ConditionalOnMissingBean(Flyway.class)} do Boot e
@@ -45,8 +43,8 @@ public class BillingFlywayAutoConfiguration {
     static final String HOST_FLYWAY_INITIALIZER = "flywayInitializer";
 
     @Bean(MIGRATOR_BEAN)
-    BillingSchemaMigrator billingSchemaMigrator(DataSource dataSource, Environment environment) {
-        return new BillingSchemaMigrator(dataSource, environment);
+    BillingSchemaMigrator billingSchemaMigrator(DataSource dataSource, ObjectProvider<Flyway> hostFlyway) {
+        return new BillingSchemaMigrator(dataSource, hostFlyway);
     }
 
     /**
@@ -81,15 +79,15 @@ public class BillingFlywayAutoConfiguration {
         };
     }
 
-    /** Roda o Flyway dedicado da lib assim que o {@link DataSource} está pronto. */
+    /** Roda o Flyway dedicado da lib assim que o do host termina. */
     static class BillingSchemaMigrator implements InitializingBean {
 
         private final DataSource primaryDataSource;
-        private final Environment environment;
+        private final ObjectProvider<Flyway> hostFlyway;
 
-        BillingSchemaMigrator(DataSource primaryDataSource, Environment environment) {
+        BillingSchemaMigrator(DataSource primaryDataSource, ObjectProvider<Flyway> hostFlyway) {
             this.primaryDataSource = primaryDataSource;
-            this.environment = environment;
+            this.hostFlyway = hostFlyway;
         }
 
         @Override
@@ -104,19 +102,11 @@ public class BillingFlywayAutoConfiguration {
         }
 
         private DataSource migrationDataSource() {
-            var url = environment.getProperty("spring.flyway.url");
-            if (url == null || url.isBlank()) {
-                return primaryDataSource;
+            var host = hostFlyway.getIfAvailable();
+            if (host != null && host.getConfiguration().getDataSource() != null) {
+                return host.getConfiguration().getDataSource();
             }
-            var ds = new DriverManagerDataSource(
-                    url,
-                    environment.getProperty("spring.flyway.user"),
-                    environment.getProperty("spring.flyway.password"));
-            var driver = environment.getProperty("spring.flyway.driver-class-name");
-            if (driver != null && !driver.isBlank()) {
-                ds.setDriverClassName(driver);
-            }
-            return ds;
+            return primaryDataSource;
         }
     }
 }
