@@ -1,8 +1,11 @@
 package com.jpintodigital.billing;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,9 +20,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * tabela de histórico própria ({@code flyway_schema_history_billing}) — assim as
  * versões da lib nunca colidem nem ficam fora de ordem com as {@code V*} do host.
  *
- * <p>Usa as credenciais de migração do host ({@code spring.flyway.url/user/password})
- * quando presentes — que costumam ser um papel com DDL, distinto do papel de
- * runtime (RLS). Sem elas, cai no {@link DataSource} primário. Desligue com
+ * <p>Roda <b>depois</b> do Flyway do host (quando existe), então o host encontra
+ * o schema ainda vazio e cria o próprio histórico normalmente. Usa as credenciais
+ * {@code spring.flyway.url/user/password} do host quando presentes — normalmente
+ * um papel com DDL, distinto do papel de runtime (RLS). Desligue com
  * {@code jp.billing.manage-schema=false} se o schema for gerenciado por fora.
  *
  * <p>O bean não é do tipo {@link Flyway} de propósito: um {@code @Bean Flyway}
@@ -27,16 +31,20 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  * suprimiria o Flyway do próprio host.
  */
 @AutoConfiguration(
-        afterName = "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
-        beforeName = "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration")
+        afterName = {
+            "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+            "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration"
+        })
 @ConditionalOnClass(Flyway.class)
 @ConditionalOnProperty(prefix = "jp.billing", name = "manage-schema", matchIfMissing = true)
 public class BillingFlywayAutoConfiguration {
 
     static final String LOCATION = "classpath:billing/migration";
     static final String HISTORY_TABLE = "flyway_schema_history_billing";
+    static final String MIGRATOR_BEAN = "billingSchemaMigrator";
+    static final String HOST_FLYWAY_INITIALIZER = "flywayInitializer";
 
-    @Bean
+    @Bean(MIGRATOR_BEAN)
     BillingSchemaMigrator billingSchemaMigrator(DataSource dataSource, Environment environment) {
         return new BillingSchemaMigrator(dataSource, environment);
     }
@@ -47,7 +55,30 @@ public class BillingFlywayAutoConfiguration {
      */
     @Bean
     static EntityManagerFactoryDependsOnPostProcessor billingSchemaMigratorEmfDependsOn() {
-        return new EntityManagerFactoryDependsOnPostProcessor("billingSchemaMigrator");
+        return new EntityManagerFactoryDependsOnPostProcessor(MIGRATOR_BEAN);
+    }
+
+    /**
+     * Faz o migrador da lib rodar depois do Flyway do host — mas só se o host
+     * tiver um (dependência solta, resolvida em tempo de post-processing).
+     */
+    @Bean
+    static BeanFactoryPostProcessor billingSchemaMigratorAfterHostFlyway() {
+        return beanFactory -> {
+            if (!beanFactory.containsBeanDefinition(MIGRATOR_BEAN)
+                    || !beanFactory.containsBeanDefinition(HOST_FLYWAY_INITIALIZER)) {
+                return;
+            }
+            var definition = beanFactory.getBeanDefinition(MIGRATOR_BEAN);
+            var dependsOn = new ArrayList<String>();
+            if (definition.getDependsOn() != null) {
+                Collections.addAll(dependsOn, definition.getDependsOn());
+            }
+            if (!dependsOn.contains(HOST_FLYWAY_INITIALIZER)) {
+                dependsOn.add(HOST_FLYWAY_INITIALIZER);
+            }
+            definition.setDependsOn(dependsOn.toArray(String[]::new));
+        };
     }
 
     /** Roda o Flyway dedicado da lib assim que o {@link DataSource} está pronto. */
