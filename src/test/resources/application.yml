@@ -1,0 +1,18 @@
+spring:
+  flyway:
+    locations: classpath:billing/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+jp:
+  billing:
+    reconciliation-enabled: false
+  asaas:
+    api-key: test
+    webhook-token: test-webhook-token
+
+logging:
+  level:
+    org.springframework.orm.jpa: WARN
