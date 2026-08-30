@@ -43,7 +43,7 @@ public class BillingApiBeans {
 
     @Bean
     @ConditionalOnWebApplication
-    BillingWebhookController billingWebhookController(WebhookProcessor processor) {
-        return new BillingWebhookController(processor);
+    BillingWebhookController billingWebhookController(WebhookProcessor processor, PaymentProvider provider) {
+        return new BillingWebhookController(processor, provider);
     }
 }

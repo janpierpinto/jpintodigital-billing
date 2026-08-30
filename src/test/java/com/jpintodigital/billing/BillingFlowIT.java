@@ -108,6 +108,12 @@ class BillingFlowIT {
         }
     }
 
+    @Test
+    void webhookForUnknownProviderIs404() throws Exception {
+        mockMvc.perform(post("/webhooks/billing/stripe").content("evt-y|PAYMENT_CONFIRMED|sub_y|pay-y"))
+                .andExpect(status().isNotFound());
+    }
+
     private void webhook(String body) throws Exception {
         mockMvc.perform(post("/webhooks/billing/fake").content(body)).andExpect(status().isOk());
     }

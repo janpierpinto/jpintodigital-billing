@@ -1,5 +1,6 @@
 package com.jpintodigital.billing.internal;
 
+import com.jpintodigital.billing.spi.PaymentProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -19,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 class BillingWebhookController {
 
     private final WebhookProcessor processor;
+    private final PaymentProvider paymentProvider;
 
-    BillingWebhookController(WebhookProcessor processor) {
+    BillingWebhookController(WebhookProcessor processor, PaymentProvider paymentProvider) {
         this.processor = processor;
+        this.paymentProvider = paymentProvider;
     }
 
     @PostMapping("${jp.billing.webhook-base-path:/webhooks/billing}/{provider}")
@@ -30,6 +33,9 @@ class BillingWebhookController {
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
 
+        if (!paymentProvider.name().equalsIgnoreCase(provider)) {
+            return ResponseEntity.notFound().build();
+        }
         var result = processor.ingest(body == null ? "" : body, headers(request));
         return switch (result) {
             case OK, IGNORED -> ResponseEntity.ok().build();
