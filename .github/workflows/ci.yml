@@ -45,8 +45,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Histórico inteiro: segredo vazado quase nunca está no último commit.
           fetch-depth: 0
+
+      # Varre a árvore de trabalho (não o range de commits) — a gitleaks-action
+      # quebra no primeiro push do repo (`firstCommit^` não existe).
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --redact -v
