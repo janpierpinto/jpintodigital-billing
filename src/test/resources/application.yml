@@ -1,6 +1,9 @@
 spring:
+  # A lib roda o próprio schema via BillingFlywayAutoConfiguration (Flyway
+  # dedicado, histórico flyway_schema_history_billing). O Flyway "do host" não
+  # tem nada a migrar nos testes.
   flyway:
-    locations: classpath:billing/migration
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: validate
@@ -9,9 +12,9 @@ spring:
 jp:
   billing:
     reconciliation-enabled: false
-  asaas:
-    api-key: test
-    webhook-token: test-webhook-token
+    asaas:
+      api-key: test
+      webhook-token: test-webhook-token
 
 logging:
   level:

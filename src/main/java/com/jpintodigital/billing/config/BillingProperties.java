@@ -24,6 +24,13 @@ public class BillingProperties {
     /** Cron do job de reconciliação (default: 03:17 todo dia). */
     private String reconciliationCron = "0 17 3 * * *";
 
+    /**
+     * A lib roda as próprias migrações ({@code classpath:billing/migration}) num
+     * Flyway dedicado com histórico próprio. Desligue se o host gerencia o
+     * schema {@code billing_*} por fora.
+     */
+    private boolean manageSchema = true;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -70,5 +77,13 @@ public class BillingProperties {
 
     public void setReconciliationCron(String reconciliationCron) {
         this.reconciliationCron = reconciliationCron;
+    }
+
+    public boolean isManageSchema() {
+        return manageSchema;
+    }
+
+    public void setManageSchema(boolean manageSchema) {
+        this.manageSchema = manageSchema;
     }
 }
