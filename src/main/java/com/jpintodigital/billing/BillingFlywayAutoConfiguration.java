@@ -8,6 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.jpa.autoconfigure.EntityManagerFactoryDependsOnPostProcessor;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * A lib é dona do próprio schema (tabelas {@code billing_*}). As migrações em
@@ -15,9 +17,10 @@ import org.springframework.context.annotation.Bean;
  * tabela de histórico própria ({@code flyway_schema_history_billing}) — assim as
  * versões da lib nunca colidem nem ficam fora de ordem com as {@code V*} do host.
  *
- * <p>O host <b>não</b> deve adicionar {@code billing/migration} nas suas
- * {@code spring.flyway.locations}. Desligue com {@code jp.billing.manage-schema=false}
- * se o schema for gerenciado por fora.
+ * <p>Usa as credenciais de migração do host ({@code spring.flyway.url/user/password})
+ * quando presentes — que costumam ser um papel com DDL, distinto do papel de
+ * runtime (RLS). Sem elas, cai no {@link DataSource} primário. Desligue com
+ * {@code jp.billing.manage-schema=false} se o schema for gerenciado por fora.
  *
  * <p>O bean não é do tipo {@link Flyway} de propósito: um {@code @Bean Flyway}
  * dispararia o {@code @ConditionalOnMissingBean(Flyway.class)} do Boot e
@@ -34,8 +37,8 @@ public class BillingFlywayAutoConfiguration {
     static final String HISTORY_TABLE = "flyway_schema_history_billing";
 
     @Bean
-    BillingSchemaMigrator billingSchemaMigrator(DataSource dataSource) {
-        return new BillingSchemaMigrator(dataSource);
+    BillingSchemaMigrator billingSchemaMigrator(DataSource dataSource, Environment environment) {
+        return new BillingSchemaMigrator(dataSource, environment);
     }
 
     /**
@@ -50,21 +53,39 @@ public class BillingFlywayAutoConfiguration {
     /** Roda o Flyway dedicado da lib assim que o {@link DataSource} está pronto. */
     static class BillingSchemaMigrator implements InitializingBean {
 
-        private final DataSource dataSource;
+        private final DataSource primaryDataSource;
+        private final Environment environment;
 
-        BillingSchemaMigrator(DataSource dataSource) {
-            this.dataSource = dataSource;
+        BillingSchemaMigrator(DataSource primaryDataSource, Environment environment) {
+            this.primaryDataSource = primaryDataSource;
+            this.environment = environment;
         }
 
         @Override
         public void afterPropertiesSet() {
             Flyway.configure(getClass().getClassLoader())
-                    .dataSource(dataSource)
+                    .dataSource(migrationDataSource())
                     .locations(LOCATION)
                     .table(HISTORY_TABLE)
                     .baselineOnMigrate(true)
                     .load()
                     .migrate();
+        }
+
+        private DataSource migrationDataSource() {
+            var url = environment.getProperty("spring.flyway.url");
+            if (url == null || url.isBlank()) {
+                return primaryDataSource;
+            }
+            var ds = new DriverManagerDataSource(
+                    url,
+                    environment.getProperty("spring.flyway.user"),
+                    environment.getProperty("spring.flyway.password"));
+            var driver = environment.getProperty("spring.flyway.driver-class-name");
+            if (driver != null && !driver.isBlank()) {
+                ds.setDriverClassName(driver);
+            }
+            return ds;
         }
     }
 }
