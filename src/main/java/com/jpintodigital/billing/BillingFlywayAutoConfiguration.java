@@ -96,7 +96,10 @@ public class BillingFlywayAutoConfiguration {
                     .dataSource(migrationDataSource())
                     .locations(LOCATION)
                     .table(HISTORY_TABLE)
+                    // baseline em 0: o schema do host já deixou o "public" não-vazio,
+                    // mas o histórico da lib começa do zero — V1 tem que rodar.
                     .baselineOnMigrate(true)
+                    .baselineVersion("0")
                     .load()
                     .migrate();
         }
