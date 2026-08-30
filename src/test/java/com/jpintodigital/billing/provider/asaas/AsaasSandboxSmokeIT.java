@@ -3,6 +3,7 @@ package com.jpintodigital.billing.provider.asaas;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.jpintodigital.billing.spi.PaymentProvider.CardData;
 import com.jpintodigital.billing.spi.PaymentProvider.CustomerRequest;
 import com.jpintodigital.billing.spi.PaymentProvider.ProviderCustomer;
 import com.jpintodigital.billing.spi.PaymentProvider.ProviderSubscription;
@@ -88,7 +89,7 @@ class AsaasSandboxSmokeIT {
 
         // 3. assinatura recorrente de cartão
         ProviderSubscription sub = provider.createSubscription(new SubscriptionRequest(
-                customer, cardToken, 9990L, "BRL", LocalDate.now().plusDays(1), "smoke:" + suffix));
+                customer, cardToken, null, 9990L, "BRL", LocalDate.now().plusDays(1), "smoke:" + suffix));
         assertThat(sub.id()).startsWith("sub_");
         assertThat(sub.status()).isEqualTo(ProviderSubscriptionStatus.ACTIVE);
 
@@ -102,6 +103,25 @@ class AsaasSandboxSmokeIT {
         assertThat(payments.get(0).amountCents()).isEqualTo(9990L);
 
         // 6. cancelamento
+        assertThatCode(() -> provider.cancelSubscription(sub.id())).doesNotThrowAnyException();
+    }
+
+    /** Caminho sem SDK client-side: o cartão em claro vai no createSubscription e o Asaas tokeniza. */
+    @Test
+    void createSubscriptionWithRawCard() {
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        ProviderCustomer customer = provider.ensureCustomer(new CustomerRequest(
+                "jp-billing raw " + suffix, "raw+" + suffix + "@jpintodigital.com", TEST_CPF));
+        customerId = customer.id();
+
+        var card = new CardData(
+                APPROVAL_CARD, "Smoke Test", "12", "2030", "123",
+                "smoke@jpintodigital.com", TEST_CPF, "01310000", "100", "1130000000", "8.8.8.8");
+        ProviderSubscription sub = provider.createSubscription(new SubscriptionRequest(
+                customer, null, card, 9990L, "BRL", LocalDate.now().plusDays(1), "smoke-raw:" + suffix));
+
+        assertThat(sub.id()).startsWith("sub_");
+        assertThat(sub.status()).isEqualTo(ProviderSubscriptionStatus.ACTIVE);
         assertThatCode(() -> provider.cancelSubscription(sub.id())).doesNotThrowAnyException();
     }
 

@@ -41,13 +41,34 @@ public interface PaymentProvider {
     record ProviderCustomer(String id) {
     }
 
+    /**
+     * {@code cardToken} (pré-tokenizado, p/ um futuro SDK client-side) OU
+     * {@code card} (cartão em claro — o provedor tokeniza no ato). Exatamente um
+     * dos dois. O PAN nunca é persistido pela lib.
+     */
     record SubscriptionRequest(
             ProviderCustomer customer,
             String cardToken,
+            CardData card,
             long amountCents,
             String currency,
             java.time.LocalDate firstDueDate,
             String externalReference) {
+    }
+
+    /** Dados de cartão em claro — só trafegam até o provedor, nunca são gravados. */
+    record CardData(
+            String number,
+            String holderName,
+            String expiryMonth,
+            String expiryYear,
+            String ccv,
+            String holderEmail,
+            String holderCpfCnpj,
+            String holderPostalCode,
+            String holderAddressNumber,
+            String holderPhone,
+            String remoteIp) {
     }
 
     /** {@code currentPeriodEnd}/{@code nextDueDate} podem ser nulos conforme o provedor. */
