@@ -7,6 +7,7 @@ import com.jpintodigital.billing.provider.asaas.AsaasProperties;
 import com.jpintodigital.billing.spi.PaymentProvider;
 import com.jpintodigital.billing.spi.SubscriptionListener;
 import java.time.Clock;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -49,7 +50,8 @@ public class BillingAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(PaymentProvider.class)
     @ConditionalOnProperty(prefix = "jp.billing", name = "provider", havingValue = "asaas", matchIfMissing = true)
-    PaymentProvider asaasPaymentProvider(RestClient.Builder builder, AsaasProperties props, ObjectMapper mapper) {
-        return new AsaasPaymentProvider(builder, props, mapper);
+    PaymentProvider asaasPaymentProvider(
+            ObjectProvider<RestClient.Builder> builders, AsaasProperties props, ObjectMapper mapper) {
+        return new AsaasPaymentProvider(builders.getIfAvailable(RestClient::builder), props, mapper);
     }
 }
