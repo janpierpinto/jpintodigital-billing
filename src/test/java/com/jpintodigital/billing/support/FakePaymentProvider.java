@@ -19,6 +19,7 @@ public class FakePaymentProvider implements PaymentProvider {
     public volatile int cancelCalls = 0;
     public volatile int updateValueCalls = 0;
     public volatile long lastUpdatedValueCents = -1;
+    public volatile long lastCreatedSubscriptionAmountCents = -1;
 
     @Override
     public String name() {
@@ -32,6 +33,7 @@ public class FakePaymentProvider implements PaymentProvider {
 
     @Override
     public ProviderSubscription createSubscription(SubscriptionRequest request) {
+        lastCreatedSubscriptionAmountCents = request.amountCents();
         return new ProviderSubscription("sub_" + seq.incrementAndGet(), ProviderSubscriptionStatus.ACTIVE,
                 null, request.firstDueDate());
     }

@@ -49,6 +49,15 @@ class BillingService implements BillingApi {
 
     @Override
     @Transactional
+    public void upsertPlan(String code, String name, long amountCents, int trialDays, int maxUnits) {
+        plans.findById(code)
+                .ifPresentOrElse(
+                        existing -> existing.update(name, amountCents, trialDays, maxUnits),
+                        () -> plans.save(new Plan(code, name, amountCents, trialDays, maxUnits)));
+    }
+
+    @Override
+    @Transactional
     public SubscriptionView startTrial(UUID tenantId, String planCode) {
         var existing = subscriptions.findByTenantId(tenantId);
         if (existing.isPresent()) {
@@ -127,6 +136,16 @@ class BillingService implements BillingApi {
             provider.updateSubscriptionValue(sub.getProviderSubscriptionId(), novoPlano.getAmountCents());
         }
         sub.changePlan(novoPlano.getCode());
+        return toView(sub);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionView endTrialNow(UUID tenantId) {
+        var sub = require(tenantId);
+        if (sub.getStatus() == SubscriptionStatus.TRIALING && sub.getProviderSubscriptionId() == null) {
+            sub.ajustarTrialEnd(Instant.now(clock));
+        }
         return toView(sub);
     }
 

@@ -23,6 +23,11 @@ jp:
         amount-cents: 19900
         trial-days: 14
         max-units: 0
+      - code: free
+        name: Free
+        amount-cents: 0
+        trial-days: 36500
+        max-units: 0
     asaas:
       api-key: test
       webhook-token: test-webhook-token

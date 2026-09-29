@@ -10,6 +10,14 @@ import java.util.UUID;
  */
 public interface BillingApi {
 
+    /**
+     * Cria o plano se {@code code} não existir, ou atualiza nome/valor/trial/limite se já
+     * existir — idempotente por {@code code}, nunca desativa. Existe para o host materializar
+     * um preço que vem de outro lugar (ex.: catálogo por vertical e override por negócio) como
+     * um plano estável que esta lib entende, sem que a lib precise saber de onde o preço veio.
+     */
+    void upsertPlan(String code, String name, long amountCents, int trialDays, int maxUnits);
+
     /** Inicia o trial (sem cartão). Idempotente: se já existe assinatura, devolve a atual. */
     SubscriptionView startTrial(UUID tenantId, String planCode);
 
@@ -38,6 +46,16 @@ public interface BillingApi {
      * {@code PaymentProvider#updateSubscriptionValue}).
      */
     SubscriptionView changePlan(UUID tenantId, String newPlanCode);
+
+    /**
+     * Termina o trial agora. Existe para quando o tenant estava numa faixa sem cobrança de
+     * verdade (ex.: plano gratuito com trial de 100 anos, convenção do host para nunca deixar
+     * a reconciliação expirar sozinha) e escolheu uma faixa paga: sem isto, a primeira cobrança
+     * nasceria com a data de vencimento do trial antigo (daqui a décadas), não hoje. Não faz
+     * nada se já existe assinatura de verdade no provedor, ou se o status não é TRIALING —
+     * seguro de chamar sempre, sem o chamador verificar o estado antes.
+     */
+    SubscriptionView endTrialNow(UUID tenantId);
 
     /** Cancela no provedor e marca CANCELED. Acesso segue até o fim do período pago. */
     SubscriptionView cancel(UUID tenantId);

@@ -44,6 +44,18 @@ public class Plan {
         this.maxUnits = maxUnits;
     }
 
+    /**
+     * Atualiza o plano existente — usado pelo upsert do host (ver
+     * {@code BillingApi#upsertPlan}). {@code active} não muda aqui: quem chama nunca desativa
+     * pelo upsert, só cria ou reprecifica.
+     */
+    public void update(String name, long amountCents, int trialDays, int maxUnits) {
+        this.name = name;
+        this.amountCents = amountCents;
+        this.trialDays = trialDays;
+        this.maxUnits = maxUnits;
+    }
+
     public String getCode() {
         return code;
     }

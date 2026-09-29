@@ -115,6 +115,65 @@ class BillingFlowIT {
     }
 
     @Test
+    void upsertPlanCreatesThenUpdatesTheSameCode() throws Exception {
+        var codigo = "bridge:beauty:t-" + UUID.randomUUID();
+        billing.upsertPlan(codigo, "Standard — beauty", 7500L, 0, 0);
+
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, codigo);
+        assertThat(billing.statusOf(tenant).orElseThrow().planCode()).isEqualTo(codigo);
+        billing.subscribe(tenant, new CardToken("tok_bridge_1", "Ada", "ada@example.com", "12345678900"));
+        assertThat(provider.lastCreatedSubscriptionAmountCents).isEqualTo(7500L);
+
+        // Repreçar o mesmo code (o "update" do upsert) não cria linha nova nem quebra quem já
+        // estava nele -- só reescreve nome/valor/trial/limite para a próxima assinatura que
+        // usar esse code.
+        billing.upsertPlan(codigo, "Standard — beauty", 8000L, 0, 0);
+        var outroTenant = UUID.randomUUID();
+        billing.startTrial(outroTenant, codigo);
+        billing.subscribe(outroTenant, new CardToken("tok_bridge_2", "Ada", "ada@example.com", "12345678900"));
+        assertThat(provider.lastCreatedSubscriptionAmountCents).isEqualTo(8000L);
+    }
+
+    @Test
+    void endTrialNowLetsTheFirstChargeStartTodayInsteadOfTheOldFarTrialEnd() throws Exception {
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "free"); // trial-days: 36500 -- o marcador "sem prazo real"
+        var antes = billing.statusOf(tenant).orElseThrow();
+        assertThat(antes.trialEnd()).isAfter(java.time.Instant.now().plus(java.time.Duration.ofDays(365)));
+
+        // Escolheu uma faixa paga: troca o plano local (sem assinatura no provedor ainda) e
+        // termina o trial antigo, do mesmo jeito que a ponte de troca de plano do host faria.
+        billing.changePlan(tenant, "premium");
+        var trocado = billing.endTrialNow(tenant);
+
+        assertThat(trocado.trialEnd()).isBeforeOrEqualTo(java.time.Instant.now());
+        assertThat(trocado.status()).isEqualTo(SubscriptionStatus.TRIALING); // endTrialNow não muda o status
+
+        // A cobrança real agora nasce hoje, não daqui a 100 anos: `doSubscribe` só marca ACTIVE
+        // (e abre o período) quando `firstDueDate` não está no futuro -- é exatamente o que o
+        // bug faria dar errado sem `endTrialNow` (firstDueDate cairia ~100 anos no futuro, e a
+        // assinatura ficaria TRIALING para sempre em vez de cobrar).
+        var subd = billing.subscribeWithCard(tenant, new com.jpintodigital.billing.api.BillingApi.CardInput(
+                "4444444444444444", "Ada", "12", "2030", "123",
+                "ada@example.com", "12345678900", "01310000", "100", "1130000000", "8.8.8.8"));
+        assertThat(subd.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subd.currentPeriodEnd()).isNotNull();
+    }
+
+    @Test
+    void endTrialNowDoesNothingWhenThereIsAlreadyARealSubscription() throws Exception {
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+        billing.subscribe(tenant, new CardToken("tok_789", "Ada", "ada@example.com", "12345678900"));
+        var antes = billing.statusOf(tenant).orElseThrow();
+
+        var depois = billing.endTrialNow(tenant);
+
+        assertThat(depois.trialEnd()).isEqualTo(antes.trialEnd());
+    }
+
+    @Test
     void changePlanUpdatesValueAtProviderWithoutCancelingOrTouchingCard() throws Exception {
         int cancelCallsAntes = provider.cancelCalls;
         int updateCallsAntes = provider.updateValueCalls;

@@ -86,6 +86,17 @@ public class Subscription {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Ajusta {@code trialEnd} sem mudar mais nada — usado só por
+     * {@code BillingService#endTrialNow}, para o caso de um trial sem prazo real (marcador do
+     * host, ex.: plano gratuito com trial de 100 anos) que precisa nascer de verdade quando o
+     * tenant escolhe uma faixa paga.
+     */
+    public void ajustarTrialEnd(Instant novoTrialEnd) {
+        this.trialEnd = novoTrialEnd;
+        this.updatedAt = Instant.now();
+    }
+
     public void attachProvider(String provider, String customerId, String subscriptionId) {
         this.provider = provider;
         this.providerCustomerId = customerId;
