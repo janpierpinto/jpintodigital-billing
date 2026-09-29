@@ -18,6 +18,11 @@ jp:
         amount-cents: 9900
         trial-days: 14
         max-units: 10
+      - code: premium
+        name: Premium
+        amount-cents: 19900
+        trial-days: 14
+        max-units: 0
     asaas:
       api-key: test
       webhook-token: test-webhook-token

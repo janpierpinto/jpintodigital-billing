@@ -77,6 +77,15 @@ public class Subscription {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Troca o plano local. Quem chama decide antes se precisa refletir isso no provedor (ver
+     * {@code BillingService#changePlan}) — esta entidade só grava o que já foi aceito lá.
+     */
+    public void changePlan(String newPlanCode) {
+        this.planCode = newPlanCode;
+        this.updatedAt = Instant.now();
+    }
+
     public void attachProvider(String provider, String customerId, String subscriptionId) {
         this.provider = provider;
         this.providerCustomerId = customerId;

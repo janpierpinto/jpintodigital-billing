@@ -99,6 +99,25 @@ class AsaasHttpTest {
     }
 
     @Test
+    void updateSubscriptionValueSendsPutWithoutCardFields() {
+        server.expect(requestTo(BASE + "/subscriptions/sub_7"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.value").value(199.90))
+                .andExpect(jsonPath("$.updatePendingPayments").value(false))
+                .andExpect(jsonPath("$.creditCard").doesNotExist())
+                .andExpect(jsonPath("$.creditCardToken").doesNotExist())
+                .andRespond(withSuccess(
+                        "{\"id\":\"sub_7\",\"status\":\"ACTIVE\",\"nextDueDate\":\"2026-10-15\"}",
+                        MediaType.APPLICATION_JSON));
+
+        ProviderSubscription sub = asaas.updateSubscriptionValue("sub_7", 19990L);
+
+        assertThat(sub.id()).isEqualTo("sub_7");
+        assertThat(sub.status()).isEqualTo(ProviderSubscriptionStatus.ACTIVE);
+        server.verify();
+    }
+
+    @Test
     void fetchSubscriptionMapsOverdue() {
         server.expect(requestTo(BASE + "/subscriptions/sub_7"))
                 .andExpect(method(HttpMethod.GET))

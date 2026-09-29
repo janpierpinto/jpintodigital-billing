@@ -87,6 +87,21 @@ public class AsaasPaymentProvider implements PaymentProvider {
         return toSubscription(node);
     }
 
+    /**
+     * {@code updatePendingPayments: false} explícito — a cobrança já gerada para o ciclo
+     * corrente não é reemitida com o valor novo; só as próximas. Trocar de plano no meio do
+     * ciclo já pago não devolve nem cobra diferença: fica para quando a proração entrar
+     * (docs/09-roadmap.md, Fase 3, "troca de plano com proração" — ainda não implementada).
+     */
+    @Override
+    public ProviderSubscription updateSubscriptionValue(String providerSubscriptionId, long amountCents) {
+        var body = Map.of(
+                "value", BigDecimal.valueOf(amountCents, 2),
+                "updatePendingPayments", false);
+        var node = put("/subscriptions/{id}", providerSubscriptionId, body);
+        return toSubscription(node);
+    }
+
     @Override
     public void cancelSubscription(String providerSubscriptionId) {
         http.delete().uri("/subscriptions/{id}", providerSubscriptionId).retrieve().toBodilessEntity();
@@ -188,6 +203,10 @@ public class AsaasPaymentProvider implements PaymentProvider {
 
     private JsonNode post(String path, Object body) {
         return http.post().uri(path).body(body).retrieve().body(JsonNode.class);
+    }
+
+    private JsonNode put(String pathTemplate, Object id, Object body) {
+        return http.put().uri(pathTemplate, id).body(body).retrieve().body(JsonNode.class);
     }
 
     private JsonNode get(String pathTemplate, Object... args) {

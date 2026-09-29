@@ -115,6 +115,77 @@ class BillingFlowIT {
     }
 
     @Test
+    void changePlanUpdatesValueAtProviderWithoutCancelingOrTouchingCard() throws Exception {
+        int cancelCallsAntes = provider.cancelCalls;
+        int updateCallsAntes = provider.updateValueCalls;
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+        var subd = billing.subscribe(tenant, new CardToken("tok_123", "Ada", "ada@example.com", "12345678900"));
+        webhook("evt-plan-1|PAYMENT_CONFIRMED|" + subd.providerSubscriptionId() + "|pay-plan-1");
+        assertThat(billing.statusOf(tenant).orElseThrow().status()).isEqualTo(SubscriptionStatus.ACTIVE);
+
+        var trocado = billing.changePlan(tenant, "premium");
+
+        assertThat(trocado.planCode()).isEqualTo("premium");
+        // mesma assinatura no provedor — nunca cancelou pra recriar, o cartão continua o mesmo
+        assertThat(trocado.providerSubscriptionId()).isEqualTo(subd.providerSubscriptionId());
+        // deltas, não valor absoluto: `provider` é bean singleton reaproveitado por todos os
+        // métodos desta classe, na mesma execução do Spring — outro teste já pode ter chamado
+        // cancelar/trocar plano antes deste, na ordem que o JUnit decidir rodar.
+        assertThat(provider.cancelCalls).isEqualTo(cancelCallsAntes);
+        assertThat(provider.updateValueCalls).isEqualTo(updateCallsAntes + 1);
+        assertThat(provider.lastUpdatedValueCents).isEqualTo(19900L);
+        // status não muda por trocar de plano — não é reação a pagamento
+        assertThat(trocado.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+    }
+
+    @Test
+    void changePlanForTheSamePlanIsIdempotentAndDoesNotCallProvider() throws Exception {
+        int updateCallsAntes = provider.updateValueCalls;
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+        billing.subscribe(tenant, new CardToken("tok_456", "Ada", "ada@example.com", "12345678900"));
+
+        var mesmo = billing.changePlan(tenant, "standard");
+
+        assertThat(mesmo.planCode()).isEqualTo("standard");
+        assertThat(provider.updateValueCalls).isEqualTo(updateCallsAntes);
+    }
+
+    @Test
+    void changePlanDuringTrialWithoutCardYetOnlySwitchesLocalPlan() {
+        int updateCallsAntes = provider.updateValueCalls;
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+
+        var trocado = billing.changePlan(tenant, "premium");
+
+        assertThat(trocado.planCode()).isEqualTo("premium");
+        assertThat(trocado.status()).isEqualTo(SubscriptionStatus.TRIALING);
+        // sem assinatura no provedor ainda — nada para atualizar lá
+        assertThat(provider.updateValueCalls).isEqualTo(updateCallsAntes);
+    }
+
+    @Test
+    void changePlanRejectsCanceledSubscription() {
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+        billing.cancel(tenant);
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> billing.changePlan(tenant, "premium"));
+    }
+
+    @Test
+    void changePlanRejectsUnknownPlanCode() {
+        var tenant = UUID.randomUUID();
+        billing.startTrial(tenant, "standard");
+
+        org.junit.jupiter.api.Assertions.assertThrows(java.util.NoSuchElementException.class,
+                () -> billing.changePlan(tenant, "inexistente"));
+    }
+
+    @Test
     void webhookWithBadTokenIsRejected() throws Exception {
         provider.webhookAuthOk = false;
         try {

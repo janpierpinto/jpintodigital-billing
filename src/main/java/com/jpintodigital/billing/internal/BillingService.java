@@ -111,6 +111,27 @@ class BillingService implements BillingApi {
 
     @Override
     @Transactional
+    public SubscriptionView changePlan(UUID tenantId, String newPlanCode) {
+        var sub = require(tenantId);
+        if (sub.getStatus().isTerminal()) {
+            throw new IllegalStateException(
+                    "assinatura cancelada/expirada não troca de plano: " + tenantId);
+        }
+        var novoPlano = plan(newPlanCode);
+        if (novoPlano.getCode().equals(sub.getPlanCode())) {
+            return toView(sub); // já está nesse plano — idempotente, não chama o provedor de novo
+        }
+        if (sub.getProviderSubscriptionId() != null) {
+            // Assinatura de verdade no provedor (mesmo em trial, se já capturou cartão):
+            // atualiza o valor lá, sem tocar no cartão em arquivo.
+            provider.updateSubscriptionValue(sub.getProviderSubscriptionId(), novoPlano.getAmountCents());
+        }
+        sub.changePlan(novoPlano.getCode());
+        return toView(sub);
+    }
+
+    @Override
+    @Transactional
     public SubscriptionView cancel(UUID tenantId) {
         var sub = require(tenantId);
         if (sub.getProviderSubscriptionId() != null) {

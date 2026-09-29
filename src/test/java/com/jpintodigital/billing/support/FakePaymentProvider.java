@@ -17,6 +17,8 @@ public class FakePaymentProvider implements PaymentProvider {
     public final List<ProviderPayment> payments = new ArrayList<>();
     public volatile boolean webhookAuthOk = true;
     public volatile int cancelCalls = 0;
+    public volatile int updateValueCalls = 0;
+    public volatile long lastUpdatedValueCents = -1;
 
     @Override
     public String name() {
@@ -32,6 +34,14 @@ public class FakePaymentProvider implements PaymentProvider {
     public ProviderSubscription createSubscription(SubscriptionRequest request) {
         return new ProviderSubscription("sub_" + seq.incrementAndGet(), ProviderSubscriptionStatus.ACTIVE,
                 null, request.firstDueDate());
+    }
+
+    @Override
+    public ProviderSubscription updateSubscriptionValue(String providerSubscriptionId, long amountCents) {
+        updateValueCalls++;
+        lastUpdatedValueCents = amountCents;
+        return new ProviderSubscription(providerSubscriptionId, subscriptionStatus, null,
+                LocalDate.now().plusMonths(1));
     }
 
     @Override

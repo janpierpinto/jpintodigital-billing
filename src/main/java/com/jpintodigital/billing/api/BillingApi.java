@@ -26,6 +26,19 @@ public interface BillingApi {
      */
     SubscriptionView subscribeWithCard(UUID tenantId, CardInput card);
 
+    /**
+     * Troca o plano da assinatura sem pedir cartão de novo. Se já existe assinatura de verdade
+     * no provedor (cartão em arquivo, mesmo em trial), atualiza o valor lá — o cartão
+     * tokenizado continua sendo o mesmo, porque a chamada ao provedor é de atualização, nunca
+     * de cancelar-e-recriar. Sem assinatura no provedor ainda (trial sem cartão), só troca o
+     * plano local; a primeira cobrança continua exigindo cartão, como sempre exigiu. Mesmo
+     * plano de novo é idempotente. Assinatura cancelada/expirada não troca de plano.
+     *
+     * <p>Sem proração: o ciclo já cobrado não é ajustado, só os próximos (ver o javadoc de
+     * {@code PaymentProvider#updateSubscriptionValue}).
+     */
+    SubscriptionView changePlan(UUID tenantId, String newPlanCode);
+
     /** Cancela no provedor e marca CANCELED. Acesso segue até o fim do período pago. */
     SubscriptionView cancel(UUID tenantId);
 

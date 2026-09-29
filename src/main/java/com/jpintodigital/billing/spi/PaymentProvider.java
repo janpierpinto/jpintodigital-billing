@@ -20,6 +20,16 @@ public interface PaymentProvider {
     /** Cria a assinatura recorrente de cartão de crédito. */
     ProviderSubscription createSubscription(SubscriptionRequest request);
 
+    /**
+     * Troca o valor de uma assinatura existente, sem tocar no cartão em arquivo — é assim que
+     * uma troca de plano preserva o cartão sem pedir para o cliente digitar de novo. No Asaas
+     * isso é {@code PUT /subscriptions/{id}} e depende da funcionalidade de tokenização estar
+     * habilitada na conta (liberação comercial, separada da liberação de subconta/split); sem
+     * ela o provedor recusa a chamada, e quem chama isto vê a exceção subir, sem gravar nada
+     * localmente (ver {@code BillingService#changePlan}).
+     */
+    ProviderSubscription updateSubscriptionValue(String providerSubscriptionId, long amountCents);
+
     void cancelSubscription(String providerSubscriptionId);
 
     /** Estado atual da assinatura no provedor — fonte da verdade para a reconciliação. */
