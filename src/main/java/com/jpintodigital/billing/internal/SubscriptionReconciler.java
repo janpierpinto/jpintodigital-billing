@@ -62,7 +62,9 @@ class SubscriptionReconciler {
         var providerSub = provider.fetchSubscription(sub.getProviderSubscriptionId());
         syncPayments(sub);
 
-        var target = SubscriptionStateMachine.fromProviderState(providerSub.status(), pastDueWithinGrace(sub));
+        boolean trialRunning = sub.getStatus() == SubscriptionStatus.TRIALING && !trialEnded;
+        var target = SubscriptionStateMachine.fromProviderState(
+                providerSub.status(), pastDueWithinGrace(sub), trialRunning);
         if (target != null && target != sub.getStatus()) {
             var periodEnd = target == SubscriptionStatus.ACTIVE
                     ? (providerSub.currentPeriodEnd() != null

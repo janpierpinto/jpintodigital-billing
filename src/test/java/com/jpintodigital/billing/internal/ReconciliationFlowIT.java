@@ -137,6 +137,30 @@ class ReconciliationFlowIT {
         assertThat(billing.statusOf(tenant).orElseThrow().status()).isEqualTo(SubscriptionStatus.ACTIVE);
     }
 
+    /**
+     * Bug de 2026-11-23: o negócio cadastra o cartão no primeiro dia do teste, o Asaas responde
+     * ACTIVE (a assinatura existe, cobrança marcada para o fim do teste) e a reconciliação da
+     * madrugada virava a assinatura para ACTIVE — o painel dizia "Em dia" com o teste correndo.
+     */
+    @Test
+    void cardDuringTrialKeepsTrialing() {
+        billing.startTrial(tenant, "standard"); // trialEnd = now + 14d
+        billing.subscribe(tenant, new CardToken("tok", "Ada", "ada@x.com", "1"));
+        provider.subscriptionStatus = ProviderSubscriptionStatus.ACTIVE;
+        provider.addPayment("pay_1", ProviderPaymentStatus.PENDING, 9900);
+
+        reconciler.reconcile(subId());
+
+        var status = billing.statusOf(tenant).orElseThrow();
+        assertThat(status.status()).isEqualTo(SubscriptionStatus.TRIALING);
+        assertThat(status.trialEnd()).isNotNull();
+
+        // Passado o fim do teste, o provedor ACTIVE volta a valer como "em dia".
+        clock.advance(Duration.ofDays(15));
+        reconciler.reconcile(subId());
+        assertThat(billing.statusOf(tenant).orElseThrow().status()).isEqualTo(SubscriptionStatus.ACTIVE);
+    }
+
     @Test
     void syncsPaymentsFromProvider() {
         billing.startTrial(tenant, "standard");

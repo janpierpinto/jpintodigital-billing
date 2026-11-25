@@ -37,14 +37,24 @@ class SubscriptionStateMachineTest {
 
     @Test
     void reconciliationFromProviderState() {
-        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.ACTIVE, false))
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.ACTIVE, false, false))
                 .isEqualTo(SubscriptionStatus.ACTIVE);
-        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.OVERDUE, true))
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.OVERDUE, true, false))
                 .isEqualTo(SubscriptionStatus.PAST_DUE);
-        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.OVERDUE, false))
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.OVERDUE, false, false))
                 .isEqualTo(SubscriptionStatus.EXPIRED);
-        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.UNKNOWN, false))
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.UNKNOWN, false, false))
                 .isNull();
+    }
+
+    /** No Asaas a assinatura é ACTIVE desde o cadastro do cartão: isso não encerra o teste grátis. */
+    @Test
+    void providerActiveDoesNotEndARunningTrial() {
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.ACTIVE, false, true))
+                .isNull();
+        // Cancelamento no provedor continua valendo durante o teste.
+        assertThat(SubscriptionStateMachine.fromProviderState(ProviderSubscriptionStatus.CANCELED, false, true))
+                .isEqualTo(SubscriptionStatus.CANCELED);
     }
 
     @Test

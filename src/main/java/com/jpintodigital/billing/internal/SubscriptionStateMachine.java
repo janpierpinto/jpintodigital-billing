@@ -24,10 +24,19 @@ final class SubscriptionStateMachine {
         };
     }
 
-    /** Reconciliação: computa do estado absoluto do provedor. {@code null} = não mexe. */
-    static SubscriptionStatus fromProviderState(ProviderSubscriptionStatus providerStatus, boolean pastDueWithinGrace) {
+    /**
+     * Reconciliação: computa do estado absoluto do provedor. {@code null} = não mexe.
+     *
+     * <p>{@code trialRunning}: assinatura em teste com o fim do teste ainda no futuro. No Asaas,
+     * ACTIVE só diz que a assinatura existe e não foi cancelada — ela nasce ACTIVE já no cadastro do
+     * cartão, com a primeira cobrança marcada para o fim do teste. Ler isso como "pagou" encerrava o
+     * teste grátis na primeira reconciliação (bug de 2026-11-23). Durante o teste, só um pagamento
+     * confirmado (webhook) ou o cancelamento mudam o estado.
+     */
+    static SubscriptionStatus fromProviderState(
+            ProviderSubscriptionStatus providerStatus, boolean pastDueWithinGrace, boolean trialRunning) {
         return switch (providerStatus) {
-            case ACTIVE -> SubscriptionStatus.ACTIVE;
+            case ACTIVE -> trialRunning ? null : SubscriptionStatus.ACTIVE;
             case OVERDUE -> pastDueWithinGrace ? SubscriptionStatus.PAST_DUE : SubscriptionStatus.EXPIRED;
             case CANCELED -> SubscriptionStatus.CANCELED;
             case INACTIVE -> SubscriptionStatus.EXPIRED;
